@@ -1,5 +1,7 @@
 import streamlit as st
 
+from ui.upload import show_upload_page
+
 st.set_page_config(
     page_title="AutoDS",
     page_icon="🤖",
@@ -11,26 +13,7 @@ st.title("🤖 AutoDS – AI Data Science Copilot")
 
 st.markdown("---")
 
-st.success("✅ Sprint 1: Project Setup completed successfully!")
+st.sidebar.title("Navigation")
+st.sidebar.success("Sprint 2")
 
-st.markdown(
-    """
-Welcome to **AutoDS**.
-
-This application will automate the complete Machine Learning workflow, including:
-
-- 📂 Dataset Upload
-- 🔍 Data Validation
-- 📊 Exploratory Data Analysis (EDA)
-- ⚙️ Data Preprocessing
-- 🤖 Model Training
-- 📈 Model Comparison
-- 🎯 Hyperparameter Optimization
-- 🧠 Explainable AI (SHAP)
-- 📄 PDF Report Generation
-- 💾 Model Saving
-
----
-🚧 **Current Status:** Sprint 1 – Project Setup
-"""
-)
+df=show_upload_page()

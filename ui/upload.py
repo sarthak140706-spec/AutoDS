@@ -1,0 +1,39 @@
+import streamlit as st
+
+from data.loader import load_dataset
+from data.validator import validate_dataset
+from data.preview import show_preview
+
+
+def show_upload_page():
+    """Display the dataset upload page."""
+
+    st.header("📂 Upload Dataset")
+
+    st.write(
+        "Upload a CSV or Excel dataset to begin the machine learning workflow."
+    )
+
+    uploaded_file = st.file_uploader(
+        label="Choose a dataset",
+        type=["csv", "xlsx"],
+        help="Supported formats: CSV (.csv) and Excel (.xlsx)"
+    )
+
+    if uploaded_file is None:
+        st.info("👆 Please upload a CSV or Excel file to continue.")
+        return None
+
+    dataframe = load_dataset(uploaded_file)
+
+    is_valid,message = validate_dataset(dataframe)
+
+    if not is_valid:
+        st.error(message)
+        return None
+
+    show_preview(dataframe)
+
+    st.success("✅ Dataset loaded successfully!")
+
+    return dataframe
