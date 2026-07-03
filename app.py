@@ -13,7 +13,7 @@ st.title("🤖 AutoDS – AI Data Science Copilot")
 
 st.markdown("---")
 
-st.sidebar.title("Navigation")
-st.sidebar.success("Sprint 2")
+st.sidebar.title("Progress")
+st.sidebar.success("Sprint 3 - EDA Completed")
 
 df=show_upload_page()

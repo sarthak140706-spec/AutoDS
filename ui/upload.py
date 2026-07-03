@@ -3,6 +3,8 @@ import streamlit as st
 from data.loader import load_dataset
 from data.validator import validate_dataset
 from data.preview import show_preview
+from eda.analyzer import analyze_dataset
+from ui.eda_page import show_eda_page
 
 
 def show_upload_page():
@@ -32,8 +34,11 @@ def show_upload_page():
         st.error(message)
         return None
 
+    st.success("✅ Dataset loaded successfully!")
+
     show_preview(dataframe)
 
-    st.success("✅ Dataset loaded successfully!")
+    eda_results = analyze_dataset(dataframe)
+    show_eda_page(dataframe,eda_results)
 
     return dataframe
