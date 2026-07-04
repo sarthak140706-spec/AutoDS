@@ -1,17 +1,28 @@
 from sklearn.preprocessing import StandardScaler
 
-def scale_dataset(dataframe):
 
-    df = dataframe.copy()
+def scale_dataset(X_train, X_test):
+    """
+    Scale numerical features using statistics from the training data only.
+    """
 
-    numerical_col = df.select_dtypes(include='number').columns.tolist()
+    X_train = X_train.copy()
+    X_test = X_test.copy()
 
-    if len(numerical_col)>0:
+    numerical_columns = X_train.select_dtypes(
+        include="number"
+    ).columns.tolist()
 
-        scaler = StandardScaler()
+    scaler = StandardScaler()
 
-        scaled_values = scaler.fit_transform(df[numerical_col])
+    if len(numerical_columns) > 0:
 
-        df[numerical_col] = scaled_values
+        X_train[numerical_columns] = scaler.fit_transform(
+            X_train[numerical_columns]
+        )
 
-    return df
+        X_test[numerical_columns] = scaler.transform(
+            X_test[numerical_columns]
+        )
+
+    return X_train, X_test, scaler

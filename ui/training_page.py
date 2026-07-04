@@ -1,25 +1,22 @@
 import streamlit as st
-from preprocessing.splitter import split_dataset
+
 
 def show_training_page(dataframe):
-    # Display heading
+    """
+    Display the training page and let the user select the target column.
+    """
+
     st.header("Training Page")
 
-    # Display dropdown containing all column names
-    # User selects target column
-    target_column = st.selectbox("Select the target column", dataframe.columns)
+    target_column = st.selectbox(
+        "Select the target column",
+        options=dataframe.columns,
+        index=None,
+        placeholder="Choose the target column"
+    )
 
-    # Call split_dataset()
-    X_train, X_test, y_train, y_test = split_dataset(dataframe, target_column)
+    if target_column is None:
+        st.info("👆 Please select the target column to continue.")
+        st.stop()
 
-    # Display: Training samples / Testing samples
-    st.write(f"Training samples: {X_train.shape[0]}")
-    st.write(f"Testing samples: {X_test.shape[0]}")
-
-    st.write("Processed feature dataset preview")
-    st.dataframe(X_train.head(5))
-
-    st.write("Processed target preview")
-    st.dataframe(y_train.head(5))
-    
-    return X_train, X_test, y_train, y_test
+    return target_column

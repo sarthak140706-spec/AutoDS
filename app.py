@@ -14,6 +14,6 @@ st.title("🤖 AutoDS – AI Data Science Copilot")
 st.markdown("---")
 
 st.sidebar.title("Progress")
-st.sidebar.success("Sprint 5 - AutoML Pipeline Completed")
+st.sidebar.success("Sprint 6 - Prediction Pipeline Completed")
 
 df=show_upload_page()

@@ -1,6 +1,10 @@
 from sklearn.model_selection import train_test_split
 
+
 def split_dataset(dataframe, target_column):
+    """
+    Split dataset into train and test sets.
+    """
 
     X = dataframe.drop(columns=[target_column])
 

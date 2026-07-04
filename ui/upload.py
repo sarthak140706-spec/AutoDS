@@ -7,15 +7,19 @@ from data.preview import show_preview
 from eda.analyzer import analyze_dataset
 from ui.eda_page import show_eda_page
 
+from ui.training_page import show_training_page
+
+from preprocessing.splitter import split_dataset
 from preprocessing.cleaner import preprocess_dataset
 from preprocessing.encoder import encode_dataset
 from preprocessing.scaler import scale_dataset
 
-from ui.training_page import show_training_page
-from ui.model_page import show_model_page
-
 from models.trainer import train_models
 from models.evaluator import evaluate_models
+from models.saver import save_model
+
+from ui.model_page import show_model_page
+from ui.prediction_page import show_prediction_page
 
 
 def show_upload_page():
@@ -55,15 +59,46 @@ def show_upload_page():
     eda_results = analyze_dataset(dataframe)
     show_eda_page(dataframe, eda_results)
 
-    # ---------------- Preprocessing ----------------
-    processed_dataframe = preprocess_dataset(dataframe)
-    encoded_dataframe = encode_dataset(processed_dataframe)
-    scaled_dataframe = scale_dataset(encoded_dataframe)
+    # ---------------- Select Target ----------------
+    target_column = show_training_page(dataframe)
 
     # ---------------- Train-Test Split ----------------
-    X_train, X_test, y_train, y_test = show_training_page(scaled_dataframe)
+    X_train, X_test, y_train, y_test = split_dataset(
+        dataframe,
+        target_column
+    )
 
-    # ---------------- Train Multiple Models ----------------
+    # ---------------- Missing Value Handling ----------------
+    X_train, X_test = preprocess_dataset(
+        X_train,
+        X_test
+    )
+
+    # ---------------- Encoding ----------------
+    X_train, X_test, encoders = encode_dataset(
+        X_train,
+        X_test
+    )
+
+    # ---------------- Scaling ----------------
+    X_train, X_test, scaler = scale_dataset(
+        X_train,
+        X_test
+    )
+
+    # ---------------- Dataset Information ----------------
+    st.subheader("Processed Dataset")
+
+    st.write(f"**Training samples:** {X_train.shape[0]}")
+    st.write(f"**Testing samples:** {X_test.shape[0]}")
+
+    st.write("### Processed Feature Dataset")
+    st.dataframe(X_train.head())
+
+    st.write("### Target Preview")
+    st.dataframe(y_train.head())
+
+    # ---------------- Train Models ----------------
     models_dict = train_models(
         X_train,
         X_test,
@@ -71,7 +106,7 @@ def show_upload_page():
         y_test
     )
 
-    # ---------------- Evaluate All Models ----------------
+    # ---------------- Evaluate Models ----------------
     evaluation_results = evaluate_models(
         models_dict,
         y_test
@@ -84,4 +119,20 @@ def show_upload_page():
         y_test
     )
 
-    return models_dict, evaluation_results
+    # ---------------- Save Best Model ----------------
+    best_model, best_model_name, file_path = save_model(
+        models_dict,
+        evaluation_results,
+        encoders,
+        scaler,
+        X_train.columns
+    )
+
+    # ---------------- Prediction ----------------
+    prediction_dataframe = show_prediction_page(
+        best_model,
+        file_path,
+        target_column
+    )
+
+    return prediction_dataframe
