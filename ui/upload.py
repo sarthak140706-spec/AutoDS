@@ -4,6 +4,10 @@ from data.loader import load_dataset
 from data.validator import validate_dataset
 from data.preview import show_preview
 from eda.analyzer import analyze_dataset
+from preprocessing.cleaner import preprocess_dataset
+from preprocessing.encoder import encode_dataset
+from preprocessing.scaler import scale_dataset
+from ui.training_page import show_training_page
 from ui.eda_page import show_eda_page
 
 
@@ -41,4 +45,9 @@ def show_upload_page():
     eda_results = analyze_dataset(dataframe)
     show_eda_page(dataframe,eda_results)
 
-    return dataframe
+    processed_dataframe = preprocess_dataset(dataframe)
+    encoded_dataframe = encode_dataset(processed_dataframe)
+    scaled_dataframe = scale_dataset(encoded_dataframe)
+    show_training_page(scaled_dataframe)
+
+    return scaled_dataframe
