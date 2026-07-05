@@ -1,10 +1,10 @@
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 
 
 def encode_dataset(X_train, X_test):
     """
-    Encode categorical columns using LabelEncoder.
-    Encoders are fitted only on the training data.
+    Encode categorical columns using OrdinalEncoder.
+    Handles unseen categories during prediction.
     """
 
     X_train = X_train.copy()
@@ -18,20 +18,18 @@ def encode_dataset(X_train, X_test):
 
     for column in categorical_columns:
 
-        encoder = LabelEncoder()
-
-        X_train[column] = encoder.fit_transform(
-            X_train[column].astype(str)
+        encoder = OrdinalEncoder(
+            handle_unknown="use_encoded_value",
+            unknown_value=-1
         )
 
-        # Handle unseen categories in test data
-        X_test[column] = X_test[column].astype(str)
-
-        X_test[column] = X_test[column].apply(
-            lambda value: value if value in encoder.classes_ else encoder.classes_[0]
+        X_train[[column]] = encoder.fit_transform(
+            X_train[[column]].astype(str)
         )
 
-        X_test[column] = encoder.transform(X_test[column])
+        X_test[[column]] = encoder.transform(
+            X_test[[column]].astype(str)
+        )
 
         encoders[column] = encoder
 

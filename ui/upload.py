@@ -21,6 +21,8 @@ from models.saver import save_model
 from ui.model_page import show_model_page
 from ui.prediction_page import show_prediction_page
 
+from reports.report_generator import generate_report
+
 
 def show_upload_page():
     """Display the dataset upload page."""
@@ -57,15 +59,64 @@ def show_upload_page():
 
     # ---------------- EDA ----------------
     eda_results = analyze_dataset(dataframe)
-    show_eda_page(dataframe, eda_results)
 
-    # ---------------- Select Target ----------------
-    target_column = show_training_page(dataframe)
+    show_eda_page(
+        dataframe,
+        eda_results
+    )
+
+    # ---------------- Training Configuration ----------------
+    target_column, test_size = show_training_page(
+        dataframe
+    )
 
     # ---------------- Train-Test Split ----------------
-    X_train, X_test, y_train, y_test = split_dataset(
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        train_dataframe,
+        test_dataframe
+    ) = split_dataset(
         dataframe,
-        target_column
+        target_column,
+        test_size
+    )
+
+    # ---------------- Download Split Datasets ----------------
+    st.subheader("📥 Download Split Datasets")
+
+    train_csv = train_dataframe.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    test_csv = test_dataframe.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    train_filename = (
+        uploaded_file.name.rsplit(".", 1)[0]
+        + "_train.csv"
+    )
+
+    test_filename = (
+        uploaded_file.name.rsplit(".", 1)[0]
+        + "_test.csv"
+    )
+
+    st.download_button(
+        label="📥 Download Training Dataset",
+        data=train_csv,
+        file_name=train_filename,
+        mime="text/csv"
+    )
+
+    st.download_button(
+        label="📥 Download Testing Dataset",
+        data=test_csv,
+        file_name=test_filename,
+        mime="text/csv"
     )
 
     # ---------------- Missing Value Handling ----------------
@@ -86,16 +137,19 @@ def show_upload_page():
         X_test
     )
 
-    # ---------------- Dataset Information ----------------
+        # ---------------- Dataset Information ----------------
     st.subheader("Processed Dataset")
 
     st.write(f"**Training samples:** {X_train.shape[0]}")
+
     st.write(f"**Testing samples:** {X_test.shape[0]}")
 
     st.write("### Processed Feature Dataset")
+
     st.dataframe(X_train.head())
 
     st.write("### Target Preview")
+
     st.dataframe(y_train.head())
 
     # ---------------- Train Models ----------------
@@ -119,6 +173,29 @@ def show_upload_page():
         y_test
     )
 
+    # ---------------- Generate Report ----------------
+    report_df = generate_report(
+        dataframe,
+        target_column,
+        evaluation_results
+    )
+
+    st.subheader("📄 Machine Learning Report")
+
+    st.dataframe(report_df)
+
+    # ---------------- Download Report ----------------
+    report_csv = report_df.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    st.download_button(
+        label="📥 Download ML Report",
+        data=report_csv,
+        file_name="ml_report.csv",
+        mime="text/csv"
+    )
+
     # ---------------- Save Best Model ----------------
     best_model, best_model_name, file_path = save_model(
         models_dict,
@@ -135,4 +212,4 @@ def show_upload_page():
         target_column
     )
 
-    return prediction_dataframe
+    return prediction_dataframe, report_df

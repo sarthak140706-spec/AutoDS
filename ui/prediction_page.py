@@ -1,17 +1,37 @@
 import streamlit as st
 import pandas as pd
 
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+    accuracy_score
+)
+
 from models.loader import load_model
 
 
-def show_prediction_page(model, file_path, target_column):
-    """Display prediction page."""
+def show_prediction_page(
+    model,
+    file_path,
+    target_column
+):
+    """
+    Prediction page.
+    Supports:
+    - Prediction only
+    - Actual vs Predicted comparison
+    - Download prediction results
+    """
 
     st.subheader("🔮 Predictions")
 
     st.success("✅ Best model saved successfully.")
 
-    # ---------------- Download Model ----------------
+    # ----------------------------------------------------
+    # Download Best Model
+    # ----------------------------------------------------
+
     with open(file_path, "rb") as model_file:
 
         st.download_button(
@@ -23,72 +43,100 @@ def show_prediction_page(model, file_path, target_column):
 
     st.markdown("---")
 
-    # ---------------- Upload Prediction Dataset ----------------
+    # ----------------------------------------------------
+    # Upload Prediction Dataset
+    # ----------------------------------------------------
+
     st.subheader("📂 Upload Dataset for Prediction")
 
     prediction_file = st.file_uploader(
-        "Choose a CSV or Excel dataset",
+        "Choose CSV or Excel File",
         type=["csv", "xlsx"],
         key="prediction_dataset"
     )
 
     if prediction_file is None:
-        st.info("👆 Upload a dataset to generate predictions.")
+
+        st.info(
+            "Upload a dataset to generate predictions."
+        )
+
         return None
 
-    # ---------------- Load Dataset ----------------
+    # ----------------------------------------------------
+    # Read Dataset
+    # ----------------------------------------------------
+
     if prediction_file.name.endswith(".csv"):
-        prediction_df = pd.read_csv(prediction_file)
+
+        uploaded_df = pd.read_csv(
+            prediction_file
+        )
+
     else:
-        prediction_df = pd.read_excel(prediction_file)
 
-    st.success("✅ Prediction dataset loaded successfully.")
+        uploaded_df = pd.read_excel(
+            prediction_file
+        )
 
-    st.write("### Dataset Preview")
-    st.dataframe(prediction_df.head())
-
-    # ---------------- Remove Target Column ----------------
-    if target_column in prediction_df.columns:
-        prediction_df = prediction_df.drop(columns=[target_column])
-
-    # ---------------- Load Saved Objects ----------------
-    loaded_model, encoders, scaler, feature_columns = load_model(
-        file_path
+    st.success(
+        "Prediction dataset loaded successfully."
     )
 
-    # ---------------- Validate Feature Columns ----------------
-    missing_columns = [
-        column for column in feature_columns
-        if column not in prediction_df.columns
-    ]
+    st.write("### Uploaded Dataset")
 
-    if missing_columns:
-        st.error(
-            f"Missing feature columns: {', '.join(missing_columns)}"
+    st.dataframe(
+        uploaded_df.head()
+    )
+
+    # ----------------------------------------------------
+    # Preserve Original Dataset
+    # ----------------------------------------------------
+
+    display_df = uploaded_df.copy()
+
+    prediction_df = uploaded_df.copy()
+
+    actual_values = None
+
+    if target_column in prediction_df.columns:
+
+        actual_values = prediction_df[
+            target_column
+        ].copy()
+
+        prediction_df.drop(
+            columns=[target_column],
+            inplace=True
         )
-        st.stop()
 
-    # Remove extra columns
-    prediction_df = prediction_df[feature_columns]
+    # ----------------------------------------------------
+    # Load Saved Objects
+    # ----------------------------------------------------
 
-    # ---------------- Encode Categorical Columns ----------------
+    (
+        loaded_model,
+        encoders,
+        scaler,
+        feature_columns
+    ) = load_model(file_path)
+
+        # ----------------------------------------------------
+    # Encode Categorical Features
+    # ----------------------------------------------------
+
     for column, encoder in encoders.items():
 
         if column in prediction_df.columns:
 
-            prediction_df[column] = prediction_df[column].astype(str)
-
-            prediction_df[column] = prediction_df[column].apply(
-                lambda value: value
-                if value in encoder.classes_
-                else encoder.classes_[0]
+            prediction_df[[column]] = encoder.transform(
+                prediction_df[[column]].astype(str)
             )
 
-            prediction_df[column] = encoder.transform(
-                prediction_df[column]
-            )
+    # ----------------------------------------------------
+    # Scale Numerical Features
+    # ----------------------------------------------------
 
-    # ---------------- Scale Numerical Columns ----------------
     numerical_columns = prediction_df.select_dtypes(
         include="number"
     ).columns.tolist()
@@ -99,61 +147,156 @@ def show_prediction_page(model, file_path, target_column):
             prediction_df[numerical_columns]
         )
 
-    # ---------------- Generate Predictions ----------------
-    predictions = loaded_model.predict(prediction_df)
+    # ----------------------------------------------------
+    # Match Training Feature Order
+    # ----------------------------------------------------
 
-    # ---------------- Prepare Results ----------------
-    result_df = prediction_df.copy()
+    prediction_df = prediction_df[
+        feature_columns
+    ]
 
-    result_df["Prediction"] = predictions
+    # ----------------------------------------------------
+    # Generate Predictions
+    # ----------------------------------------------------
 
-    # ---------------- Display Results ----------------
-    st.subheader("📊 Prediction Results")
-
-    st.dataframe(result_df)
-
-    # ---------------- Prediction Summary ----------------
-    st.subheader("📈 Prediction Summary")
-
-    st.write(f"**Total Records:** {len(result_df)}")
-
-    st.write("**Prediction Column:** Prediction")
-
-    st.write(
-        f"**Prediction Data Type:** {result_df['Prediction'].dtype}"
+    predictions = loaded_model.predict(
+        prediction_df
     )
 
-    unique_predictions = result_df["Prediction"].nunique()
+    # ----------------------------------------------------
+    # Create Final Output Table
+    # ----------------------------------------------------
 
-    st.write(f"**Unique Predictions:** {unique_predictions}")
+    result_df = display_df.copy()
 
-    if unique_predictions <= 20:
+    result_df["Predicted Value"] = predictions
 
-        st.write("### Prediction Distribution")
+    # ----------------------------------------------------
+    # Evaluation Mode
+    # ----------------------------------------------------
 
-        distribution = (
-            result_df["Prediction"]
-            .value_counts()
-            .reset_index()
+    if actual_values is not None:
+
+        result_df["Prediction Error"] = (
+            actual_values.values -
+            predictions
         )
 
-        distribution.columns = [
-            "Prediction",
-            "Count"
-        ]
+        st.subheader(
+            "📊 Actual vs Predicted"
+        )
 
-        st.dataframe(distribution)
+        st.dataframe(result_df)
 
-    # ---------------- Download Predictions ----------------
-    csv = result_df.to_csv(
+        st.subheader(
+            "📈 Evaluation Metrics"
+        )
+
+        try:
+
+            mae = mean_absolute_error(
+                actual_values,
+                predictions
+            )
+
+            mse = mean_squared_error(
+                actual_values,
+                predictions
+            )
+
+            rmse = mse ** 0.5
+
+            r2 = r2_score(
+                actual_values,
+                predictions
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.metric(
+                    "MAE",
+                    f"{mae:.4f}"
+                )
+
+            with col2:
+
+                st.metric(
+                    "RMSE",
+                    f"{rmse:.4f}"
+                )
+
+            with col3:
+
+                st.metric(
+                    "R² Score",
+                    f"{r2:.4f}"
+                )
+
+        except Exception:
+
+            accuracy = accuracy_score(
+                actual_values,
+                predictions
+            )
+
+            st.metric(
+                "Accuracy",
+                f"{accuracy:.4f}"
+            )
+
+        # ----------------------------------------------------
+    # Prediction Only Mode
+    # ----------------------------------------------------
+
+    else:
+
+        st.subheader(
+            "📊 Prediction Results"
+        )
+
+        st.dataframe(result_df)
+
+    # ----------------------------------------------------
+    # Download Prediction Results
+    # ----------------------------------------------------
+
+    prediction_csv = result_df.to_csv(
         index=False
     ).encode("utf-8")
 
     st.download_button(
-        label="📥 Download Predictions",
-        data=csv,
-        file_name="predictions.csv",
+        label="📥 Download Prediction Results",
+        data=prediction_csv,
+        file_name="prediction_results.csv",
         mime="text/csv"
     )
+
+    # ----------------------------------------------------
+    # Prediction Summary
+    # ----------------------------------------------------
+
+    st.subheader("📋 Prediction Summary")
+
+    st.write(
+        f"**Total Samples:** {len(result_df)}"
+    )
+
+    st.write(
+        f"**Predictions Generated:** {len(predictions)}"
+    )
+
+    if actual_values is not None:
+
+        st.success(
+            "Evaluation completed successfully."
+        )
+
+    else:
+
+        st.info(
+            "Actual target column not found. Showing predictions only."
+        )
 
     return result_df
