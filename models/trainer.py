@@ -1,50 +1,125 @@
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+import streamlit as st
+
+from sklearn.linear_model import (
+    LinearRegression,
+    LogisticRegression
+)
+
+from sklearn.tree import (
+    DecisionTreeRegressor,
+    DecisionTreeClassifier
+)
+
+from sklearn.ensemble import (
+    RandomForestRegressor,
+    RandomForestClassifier
+)
+
+from sklearn.svm import (
+    SVR,
+    SVC
+)
+
+from utils.problem_type import detect_problem_type
 
 
-def train_models(X_train, X_test, y_train, y_test):
+def train_models(
+    X_train,
+    X_test,
+    y_train,
+    y_test
+):
     """
-    Train multiple machine learning models automatically
-    based on the problem type.
+    Train multiple machine learning models.
     """
 
-    trained_models = {}
+    models_dict = {}
 
     # ---------------- Detect Problem Type ----------------
-    is_regression = (
-        y_train.dtype.kind in "if"
-        and y_train.nunique() > 10
+
+    problem_type = detect_problem_type(
+        y_train
     )
 
-    # ---------------- Regression Models ----------------
-    if is_regression:
+    # ---------------- Classification Models ----------------
+
+    if problem_type == "classification":
 
         models = {
-            "Linear Regression": LinearRegression(),
-            "Decision Tree Regressor": DecisionTreeRegressor(random_state=42),
-            "Random Forest Regressor": RandomForestRegressor(random_state=42)
+
+            "Logistic Regression": LogisticRegression(
+                max_iter=1000
+            ),
+
+            "Decision Tree": DecisionTreeClassifier(),
+
+            "Random Forest": RandomForestClassifier(),
+
+            "Support Vector Machine": SVC()
+
         }
 
-    # ---------------- Classification Models ----------------
+    # ---------------- Regression Models ----------------
+
     else:
 
         models = {
-            "Logistic Regression": LogisticRegression(max_iter=1000),
-            "Decision Tree Classifier": DecisionTreeClassifier(random_state=42),
-            "Random Forest Classifier": RandomForestClassifier(random_state=42)
+
+            "Linear Regression": LinearRegression(),
+
+            "Decision Tree": DecisionTreeRegressor(),
+
+            "Random Forest": RandomForestRegressor(),
+
+            "Support Vector Machine": SVR()
+
         }
 
-    # ---------------- Train Every Model ----------------
+    # ---------------- Train Models ----------------
+
     for model_name, model in models.items():
 
-        model.fit(X_train, y_train)
+        try:
 
-        predictions = model.predict(X_test)
+            model.fit(
+                X_train,
+                y_train
+            )
 
-        trained_models[model_name] = {
-            "model": model,
-            "predictions": predictions
-        }
+            predictions = model.predict(
+                X_test
+            )
 
-    return trained_models
+            models_dict[model_name] = {
+
+                "model": model,
+
+                "predictions": predictions,
+
+                "problem_type": problem_type
+
+            }
+
+            st.success(
+                f"✅ {model_name} trained successfully."
+            )
+
+        except Exception as error:
+
+            st.warning(
+                f"⚠️ {model_name} could not be trained.\n\nReason:\n{error}"
+            )
+
+            continue
+
+    # ---------------- Check ----------------
+
+    if len(models_dict) == 0:
+
+        st.error(
+            "❌ No models could be trained."
+        )
+
+        st.stop()
+
+    return models_dict

@@ -1,20 +1,40 @@
 from sklearn.preprocessing import OrdinalEncoder
 
 
-def encode_dataset(X_train, X_test):
+def encode_dataset(
+    X_train,
+    X_test,
+    enable_encoding=True
+):
     """
     Encode categorical columns using OrdinalEncoder.
-    Handles unseen categories during prediction.
+
+    If encoding is disabled, the original datasets are returned.
     """
 
     X_train = X_train.copy()
+
     X_test = X_test.copy()
+
+    # ---------------- Skip Encoding ----------------
+
+    if not enable_encoding:
+
+        return (
+            X_train,
+            X_test,
+            {}
+        )
+
+    # ---------------- Find Categorical Columns ----------------
 
     categorical_columns = X_train.select_dtypes(
         include=["object", "category"]
     ).columns.tolist()
 
     encoders = {}
+
+    # ---------------- Encode ----------------
 
     for column in categorical_columns:
 
@@ -33,4 +53,8 @@ def encode_dataset(X_train, X_test):
 
         encoders[column] = encoder
 
-    return X_train, X_test, encoders
+    return (
+        X_train,
+        X_test,
+        encoders
+    )

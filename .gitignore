@@ -33,6 +33,10 @@ saved_models/
 temp/
 reports/generated/
 
+# Trained Models
+best_model.pkl
+*.pkl
+
 # ==========================
 # Python Build Files
 # ==========================

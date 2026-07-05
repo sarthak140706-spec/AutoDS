@@ -8,6 +8,7 @@ from eda.analyzer import analyze_dataset
 from ui.eda_page import show_eda_page
 
 from ui.training_page import show_training_page
+from ui.settings import show_settings_panel
 
 from preprocessing.splitter import split_dataset
 from preprocessing.cleaner import preprocess_dataset
@@ -27,189 +28,304 @@ from reports.report_generator import generate_report
 def show_upload_page():
     """Display the dataset upload page."""
 
-    st.header("📂 Upload Dataset")
+    try:
 
-    st.write(
-        "Upload a CSV or Excel dataset to begin the machine learning workflow."
-    )
+        st.header("📂 Upload Dataset")
 
-    uploaded_file = st.file_uploader(
-        label="Choose a dataset",
-        type=["csv", "xlsx"],
-        help="Supported formats: CSV (.csv) and Excel (.xlsx)"
-    )
+        st.write(
+            "Upload a CSV or Excel dataset to begin the machine learning workflow."
+        )
 
-    if uploaded_file is None:
-        st.info("👆 Please upload a CSV or Excel file to continue.")
-        return None
+        uploaded_file = st.file_uploader(
+            label="Choose a dataset",
+            type=["csv", "xlsx"],
+            help="Supported formats: CSV (.csv) and Excel (.xlsx)"
+        )
 
-    # ---------------- Load Dataset ----------------
-    dataframe = load_dataset(uploaded_file)
+        if uploaded_file is None:
 
-    is_valid, message = validate_dataset(dataframe)
+            st.info(
+                "👆 Please upload a CSV or Excel file to continue."
+            )
 
-    if not is_valid:
-        st.error(message)
-        return None
+            return None
 
-    st.success("✅ Dataset loaded successfully!")
+        # ---------------- Load Dataset ----------------
 
-    # ---------------- Preview ----------------
-    show_preview(dataframe)
+        dataframe = load_dataset(
+            uploaded_file
+        )
 
-    # ---------------- EDA ----------------
-    eda_results = analyze_dataset(dataframe)
+        is_valid, message = validate_dataset(
+            dataframe
+        )
 
-    show_eda_page(
-        dataframe,
-        eda_results
-    )
+        if not is_valid:
 
-    # ---------------- Training Configuration ----------------
-    target_column, test_size = show_training_page(
-        dataframe
-    )
+            st.error(message)
 
-    # ---------------- Train-Test Split ----------------
-    (
-        X_train,
-        X_test,
-        y_train,
-        y_test,
-        train_dataframe,
-        test_dataframe
-    ) = split_dataset(
-        dataframe,
-        target_column,
-        test_size
-    )
+            return None
 
-    # ---------------- Download Split Datasets ----------------
-    st.subheader("📥 Download Split Datasets")
+        st.success(
+            "✅ Dataset loaded successfully!"
+        )
 
-    train_csv = train_dataframe.to_csv(
-        index=False
-    ).encode("utf-8")
+        # ---------------- Project Settings ----------------
 
-    test_csv = test_dataframe.to_csv(
-        index=False
-    ).encode("utf-8")
+        settings = show_settings_panel()
 
-    train_filename = (
-        uploaded_file.name.rsplit(".", 1)[0]
-        + "_train.csv"
-    )
+        # ---------------- Preview ----------------
 
-    test_filename = (
-        uploaded_file.name.rsplit(".", 1)[0]
-        + "_test.csv"
-    )
+        show_preview(
+            dataframe
+        )
 
-    st.download_button(
-        label="📥 Download Training Dataset",
-        data=train_csv,
-        file_name=train_filename,
-        mime="text/csv"
-    )
+        # ---------------- EDA ----------------
 
-    st.download_button(
-        label="📥 Download Testing Dataset",
-        data=test_csv,
-        file_name=test_filename,
-        mime="text/csv"
-    )
+        eda_results = analyze_dataset(
+            dataframe
+        )
 
-    # ---------------- Missing Value Handling ----------------
-    X_train, X_test = preprocess_dataset(
-        X_train,
-        X_test
-    )
+        show_eda_page(
+            dataframe,
+            eda_results
+        )
 
-    # ---------------- Encoding ----------------
-    X_train, X_test, encoders = encode_dataset(
-        X_train,
-        X_test
-    )
+        # ---------------- Training Configuration ----------------
 
-    # ---------------- Scaling ----------------
-    X_train, X_test, scaler = scale_dataset(
-        X_train,
-        X_test
-    )
+        target_column, _ = show_training_page(
+            dataframe
+        )
+
+        # ---------------- Train-Test Split ----------------
+
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            train_dataframe,
+            test_dataframe
+        ) = split_dataset(
+            dataframe,
+            target_column,
+            test_size=settings["test_size"],
+            random_state=settings["random_state"]
+        )
+
+        # ---------------- Download Split Datasets ----------------
+
+        st.subheader(
+            "📥 Download Split Datasets"
+        )
+
+        train_csv = train_dataframe.to_csv(
+            index=False
+        ).encode(
+            "utf-8"
+        )
+
+        test_csv = test_dataframe.to_csv(
+            index=False
+        ).encode(
+            "utf-8"
+        )
+
+        train_filename = (
+            uploaded_file.name.rsplit(".", 1)[0]
+            + "_train.csv"
+        )
+
+        test_filename = (
+            uploaded_file.name.rsplit(".", 1)[0]
+            + "_test.csv"
+        )
+
+        st.download_button(
+            label="📥 Download Training Dataset",
+            data=train_csv,
+            file_name=train_filename,
+            mime="text/csv"
+        )
+
+        st.download_button(
+            label="📥 Download Testing Dataset",
+            data=test_csv,
+            file_name=test_filename,
+            mime="text/csv"
+        )
+
+            # ---------------- Missing Value Handling ----------------
+
+        X_train, X_test = preprocess_dataset(
+            X_train,
+            X_test
+        )
+
+        # ---------------- Encoding ----------------
+
+        X_train, X_test, encoders = encode_dataset(
+            X_train,
+            X_test,
+            enable_encoding=settings["encoding"]
+        )
+
+        # ---------------- Scaling ----------------
+
+        X_train, X_test, scaler = scale_dataset(
+            X_train,
+            X_test,
+            enable_scaling=settings["scaling"]
+        )
 
         # ---------------- Dataset Information ----------------
-    st.subheader("Processed Dataset")
 
-    st.write(f"**Training samples:** {X_train.shape[0]}")
+        st.subheader("Processed Dataset")
 
-    st.write(f"**Testing samples:** {X_test.shape[0]}")
+        st.write(
+            f"**Training samples:** {X_train.shape[0]}"
+        )
 
-    st.write("### Processed Feature Dataset")
+        st.write(
+            f"**Testing samples:** {X_test.shape[0]}"
+        )
 
-    st.dataframe(X_train.head())
+        st.write("### Processed Feature Dataset")
 
-    st.write("### Target Preview")
+        st.dataframe(
+            X_train.head()
+        )
 
-    st.dataframe(y_train.head())
+        st.write("### Target Preview")
 
-    # ---------------- Train Models ----------------
-    models_dict = train_models(
-        X_train,
-        X_test,
-        y_train,
-        y_test
-    )
+        st.dataframe(
+            y_train.head()
+        )
 
-    # ---------------- Evaluate Models ----------------
-    evaluation_results = evaluate_models(
-        models_dict,
-        y_test
-    )
+        # ---------------- Train Models ----------------
 
-    # ---------------- Show Results ----------------
-    show_model_page(
-        models_dict,
-        evaluation_results,
-        y_test
-    )
+        models_dict = train_models(
+            X_train,
+            X_test,
+            y_train,
+            y_test
+        )
 
-    # ---------------- Generate Report ----------------
-    report_df = generate_report(
-        dataframe,
-        target_column,
-        evaluation_results
-    )
+        # ---------------- Evaluate Models ----------------
 
-    st.subheader("📄 Machine Learning Report")
+        evaluation_results = evaluate_models(
+            models_dict,
+            y_test
+        )
 
-    st.dataframe(report_df)
+        # ---------------- Show Results ----------------
 
-    # ---------------- Download Report ----------------
-    report_csv = report_df.to_csv(
-        index=False
-    ).encode("utf-8")
+        show_model_page(
+            models_dict,
+            evaluation_results,
+            y_test
+        )
 
-    st.download_button(
-        label="📥 Download ML Report",
-        data=report_csv,
-        file_name="ml_report.csv",
-        mime="text/csv"
-    )
+        # ---------------- Generate Report ----------------
 
-    # ---------------- Save Best Model ----------------
-    best_model, best_model_name, file_path = save_model(
-        models_dict,
-        evaluation_results,
-        encoders,
-        scaler,
-        X_train.columns
-    )
+        report_df = generate_report(
+            dataframe,
+            target_column,
+            evaluation_results
+        )
 
-    # ---------------- Prediction ----------------
-    prediction_dataframe = show_prediction_page(
-        best_model,
-        file_path,
-        target_column
-    )
+        st.subheader(
+            "📄 Machine Learning Report"
+        )
 
-    return prediction_dataframe, report_df
+        st.dataframe(
+            report_df
+        )
+
+        # ---------------- Download Report ----------------
+
+        report_csv = report_df.to_csv(
+            index=False
+        ).encode(
+            "utf-8"
+        )
+
+        st.download_button(
+            label="📥 Download ML Report",
+            data=report_csv,
+            file_name="ml_report.csv",
+            mime="text/csv"
+        )
+
+        # ---------------- Save Best Model ----------------
+
+        best_model, best_model_name, file_path = save_model(
+            models_dict,
+            evaluation_results,
+            encoders,
+            scaler,
+            X_train.columns,
+            save_model_enabled=settings["save_model"]
+        )
+
+        # ---------------- Prediction ----------------
+
+        if settings["save_model"]:
+
+            prediction_dataframe = show_prediction_page(
+                best_model,
+                file_path,
+                target_column
+            )
+
+        else:
+
+            prediction_dataframe = None
+
+            st.info(
+                "Prediction module is disabled because "
+                "'Save Best Model' is turned OFF."
+            )
+
+        return (
+            prediction_dataframe,
+            report_df
+        )
+
+    except FileNotFoundError:
+
+        st.error(
+            "❌ Required file was not found."
+        )
+
+        return None
+
+    except ValueError as error:
+
+        st.error(
+            f"❌ Invalid input:\n\n{error}"
+        )
+
+        return None
+
+    except KeyError as error:
+
+        st.error(
+            f"❌ Missing required column:\n\n{error}"
+        )
+
+        return None
+
+    except Exception as error:
+
+        st.error(
+            "❌ An unexpected error occurred while processing the dataset."
+        )
+
+        with st.expander(
+            "🔍 Show Technical Details"
+        ):
+
+            st.exception(error)
+
+        return None

@@ -1,4 +1,3 @@
-import os
 import joblib
 
 
@@ -7,39 +6,62 @@ def save_model(
     evaluation_results,
     encoders,
     scaler,
-    feature_columns
+    feature_columns,
+    save_model_enabled=True
 ):
     """
-    Save the best model along with preprocessing objects
-    and feature names.
+    Save the best-performing model along with preprocessing objects.
+
+    If model saving is disabled, the best model is returned
+    without writing a file to disk.
     """
 
-    first_metrics = list(evaluation_results.values())[0]
+    # ---------------- Determine Best Metric ----------------
+
+    first_metrics = list(
+        evaluation_results.values()
+    )[0]
 
     if "R2 Score" in first_metrics:
-        metric = "R2 Score"
+
+        metric_name = "R2 Score"
+
     else:
-        metric = "Accuracy"
+
+        metric_name = "Accuracy"
+
+    # ---------------- Select Best Model ----------------
 
     best_model_name = max(
         evaluation_results,
-        key=lambda model: evaluation_results[model][metric]
+        key=lambda model:
+        evaluation_results[model][metric_name]
     )
 
-    best_model = models_dict[best_model_name]["model"]
+    best_model = models_dict[
+        best_model_name
+    ]["model"]
 
-    os.makedirs("saved_models", exist_ok=True)
+    file_path = None
 
-    file_path = "saved_models/best_model.pkl"
+    # ---------------- Save Model ----------------
 
-    joblib.dump(
-        {
-            "model": best_model,
-            "encoders": encoders,
-            "scaler": scaler,
-            "feature_columns": list(feature_columns)
-        },
+    if save_model_enabled:
+
+        file_path = "best_model.pkl"
+
+        joblib.dump(
+            {
+                "model": best_model,
+                "encoders": encoders,
+                "scaler": scaler,
+                "feature_columns": list(feature_columns)
+            },
+            file_path
+        )
+
+    return (
+        best_model,
+        best_model_name,
         file_path
     )
-
-    return best_model, best_model_name, file_path
