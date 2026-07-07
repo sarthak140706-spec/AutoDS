@@ -23,6 +23,7 @@ from ui.model_page import show_model_page
 from ui.prediction_page import show_prediction_page
 
 from reports.report_generator import generate_report
+from utils.history import add_experiment
 
 
 def show_upload_page():
@@ -208,7 +209,10 @@ def show_upload_page():
             X_train,
             X_test,
             y_train,
-            y_test
+            y_test,
+            enable_hyperparameter_tuning=settings[
+                "hyperparameter_tuning"
+            ]
         )
 
         # ---------------- Evaluate Models ----------------
@@ -226,6 +230,47 @@ def show_upload_page():
             y_test
         )
 
+        # ---------------- Save Experiment ----------------
+
+        first_metrics = list(
+            evaluation_results.values()
+        )[0]
+
+        if "R2 Score" in first_metrics:
+
+            metric_name = "R2 Score"
+
+        else:
+
+            metric_name = "Accuracy"
+
+        best_model_name = max(
+
+            evaluation_results,
+
+            key=lambda model:
+            evaluation_results[model][metric_name]
+
+        )
+
+        problem_type = models_dict[
+            best_model_name
+        ]["problem_type"]
+
+        add_experiment(
+
+            best_model=best_model_name,
+
+            score=evaluation_results[
+                best_model_name
+            ][metric_name],
+
+            metric=metric_name,
+
+            problem_type=problem_type
+
+        )
+        
         # ---------------- Generate Report ----------------
 
         report_df = generate_report(

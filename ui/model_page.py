@@ -1,123 +1,380 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from io import BytesIO
+from utils.history import (
+    get_history,
+    clear_history
+)
 
 
-def show_model_page(models_dict, evaluation_results, y_test):
+def show_model_page(
+    models_dict,
+    evaluation_results,
+    y_test
+):
 
     st.subheader("🤖 Model Comparison Dashboard")
 
-    st.success("Multi-model training completed successfully.")
+    st.success(
+        "Multi-model training completed successfully."
+    )
 
     # ---------------- MODEL DETAILS ----------------
-    st.subheader("📌 Individual Model Results")
+
+    st.subheader(
+        "📌 Individual Model Results"
+    )
 
     for model_name, model_data in models_dict.items():
 
-        st.markdown(f"### {model_name}")
+        st.markdown(
+            f"### {model_name}"
+        )
 
-        st.write("**First 5 Predictions:**")
-        st.write(model_data["predictions"][:5])
+        st.write(
+            "**First 5 Predictions:**"
+        )
 
-        st.write("**First 5 Actual Values:**")
-        st.write(y_test[:5])
+        st.write(
+            model_data["predictions"][:5]
+        )
+
+        st.write(
+            "**First 5 Actual Values:**"
+        )
+
+        st.write(
+            y_test[:5]
+        )
+
+        # ---------------- Hyperparameter Tuning ----------------
+
+        if model_data.get("best_params"):
+
+            st.write(
+                "### 🔧 Best Hyperparameters"
+            )
+
+            best_params_df = pd.DataFrame(
+                {
+                    "Parameter": model_data[
+                        "best_params"
+                    ].keys(),
+                    "Value": model_data[
+                        "best_params"
+                    ].values()
+                }
+            )
+
+            st.dataframe(
+                best_params_df,
+                use_container_width=True
+            )
+
+        if model_data.get("best_cv_score") is not None:
+
+            st.write(
+                f"**Best Cross Validation Score:** "
+                f"{model_data['best_cv_score']:.4f}"
+            )
 
         st.markdown("---")
 
     # ---------------- COMPARISON TABLE ----------------
-    st.subheader("📊 Model Performance Comparison")
+
+    st.subheader(
+        "📊 Model Performance Comparison"
+    )
 
     comparison_data = []
 
     for model_name, metrics in evaluation_results.items():
 
-        row = {"Model": model_name}
+        row = {
 
-        row.update(metrics)
+            "Model": model_name
 
-        comparison_data.append(row)
+        }
 
-    comparison_df = pd.DataFrame(comparison_data)
+        row.update(
+            metrics
+        )
 
-    st.dataframe(comparison_df)
+        comparison_data.append(
+            row
+        )
+
+    comparison_df = pd.DataFrame(
+        comparison_data
+    )
+
+    st.dataframe(
+        comparison_df,
+        use_container_width=True
+    )
+
+    # ---------------- CROSS VALIDATION SUMMARY ----------------
+
+    st.subheader("📋 Cross Validation Summary")
+
+    cv_summary = []
+
+    for model_name, model_data in models_dict.items():
+
+        cv_summary.append({
+
+            "Model": model_name,
+
+            "CV Mean": model_data["cv_mean"],
+
+            "CV Std": model_data["cv_std"],
+
+            "Best GridSearch CV": model_data["best_cv_score"]
+
+        })
+
+    cv_summary_df = pd.DataFrame(
+        cv_summary
+    )
+
+    st.dataframe(
+        cv_summary_df
+    )
 
     # ---------------- DETERMINE METRIC ----------------
-    first_model_metrics = list(evaluation_results.values())[0]
+
+    first_model_metrics = list(
+        evaluation_results.values()
+    )[0]
 
     if "R2 Score" in first_model_metrics:
+
         metric_to_compare = "R2 Score"
+
         is_regression = True
+
     else:
+
         metric_to_compare = "Accuracy"
+
         is_regression = False
 
     # ---------------- MODEL COMPARISON CHART ----------------
-    st.subheader("📈 Model Comparison Chart")
 
-    chart_df = comparison_df.set_index("Model")[[metric_to_compare]]
+    st.subheader(
+        "📈 Model Comparison Chart"
+    )
 
-    st.bar_chart(chart_df)
+    chart_df = comparison_df.set_index(
+        "Model"
+    )[[metric_to_compare]]
 
-    # ---------------- BEST MODEL ----------------
-    st.subheader("🏆 Best Model")
+    st.bar_chart(
+        chart_df
+    )
 
-    best_model = comparison_df.loc[
-        comparison_df[metric_to_compare].idxmax()
+    # ---------------- CROSS VALIDATION COMPARISON ----------------
+
+    st.subheader(
+        "📈 Cross Validation Comparison"
+    )
+
+    cv_chart_df = cv_summary_df.set_index(
+        "Model"
+    )[["CV Mean"]]
+
+    st.bar_chart(
+        cv_chart_df
+    )
+
+    # ---------------- MODEL STABILITY ----------------
+
+    st.subheader(
+        "🏅 Model Stability Analysis"
+    )
+
+    stable_model = cv_summary_df.loc[
+        cv_summary_df["CV Std"].idxmin()
     ]
 
-    best_model_name = best_model["Model"]
+    st.success(
+        f"Most Stable Model: {stable_model['Model']}"
+    )
 
-    st.success(f"Best Model: {best_model_name}")
+    st.write(
+        f"**Cross Validation Mean:** "
+        f"{stable_model['CV Mean']:.4f}"
+    )
 
-    st.write(f"**{metric_to_compare}:** {best_model[metric_to_compare]:.4f}")
+    st.write(
+        f"**Cross Validation Standard Deviation:** "
+        f"{stable_model['CV Std']:.4f}"
+    )
 
-    st.write("### 📋 Best Model Summary")
+    st.info(
+        "A lower Cross Validation Standard Deviation indicates "
+        "that the model performs more consistently across "
+        "different folds of the dataset."
+    )
 
-    st.write(f"**Model Name:** {best_model_name}")
+    # ---------------- BEST MODEL ----------------
 
-    st.write(f"**Evaluation Metric:** {metric_to_compare}")
+    st.subheader(
+        "🏆 Best Model"
+    )
 
-    st.write(f"**Score:** {best_model[metric_to_compare]:.4f}")
+    best_model = comparison_df.loc[
+        comparison_df[
+            metric_to_compare
+        ].idxmax()
+    ]
+
+    best_model_name = best_model[
+        "Model"
+    ]
+
+    st.success(
+        f"Best Model: {best_model_name}"
+    )
+
+    st.write(
+        f"**{metric_to_compare}:** "
+        f"{best_model[metric_to_compare]:.4f}"
+    )
+
+    st.write(
+        "### 📋 Best Model Summary"
+    )
+
+    st.write(
+        f"**Model Name:** {best_model_name}"
+    )
+
+    st.write(
+        f"**Evaluation Metric:** {metric_to_compare}"
+    )
+
+    st.write(
+        f"**Score:** {best_model[metric_to_compare]:.4f}"
+    )
+
+    # ---------------- Best Hyperparameters ----------------
+
+    best_model_data = models_dict[
+        best_model_name
+    ]
+
+    if best_model_data.get(
+        "best_params"
+    ):
+
+        st.write(
+            "### 🔧 Optimized Hyperparameters"
+        )
+
+        best_params_df = pd.DataFrame(
+            {
+                "Parameter": best_model_data[
+                    "best_params"
+                ].keys(),
+                "Value": best_model_data[
+                    "best_params"
+                ].values()
+            }
+        )
+
+        st.dataframe(
+            best_params_df,
+            use_container_width=True
+        )
+
+    if best_model_data.get(
+        "best_cv_score"
+    ) is not None:
+
+        st.write(
+            f"**Best Cross Validation Score:** "
+            f"{best_model_data['best_cv_score']:.4f}"
+        )
 
     # ---------------- FEATURE IMPORTANCE ----------------
-    st.subheader("⭐ Feature Importance")
 
-    best_model_object = models_dict[best_model_name]["model"]
+    st.subheader(
+        "⭐ Feature Importance"
+    )
 
-    if hasattr(best_model_object, "feature_importances_"):
+    best_model_object = best_model_data[
+        "model"
+    ]
 
-        feature_importance_df = pd.DataFrame({
-            "Feature": best_model_object.feature_names_in_,
-            "Importance": best_model_object.feature_importances_
-        })
+    if hasattr(
+        best_model_object,
+        "feature_importances_"
+    ):
 
-        feature_importance_df = feature_importance_df.sort_values(
-            by="Importance",
-            ascending=False
+        feature_importance_df = pd.DataFrame(
+            {
+                "Feature":
+                    best_model_object.feature_names_in_,
+
+                "Importance":
+                    best_model_object.feature_importances_
+            }
         )
 
-        st.dataframe(feature_importance_df)
+        feature_importance_df = (
+            feature_importance_df.sort_values(
+                by="Importance",
+                ascending=False
+            )
+        )
+
+        st.dataframe(
+            feature_importance_df,
+            use_container_width=True
+        )
 
         st.bar_chart(
-            feature_importance_df.set_index("Feature")
+            feature_importance_df.set_index(
+                "Feature"
+            )
         )
 
-    elif hasattr(best_model_object, "coef_"):
+    elif hasattr(
+        best_model_object,
+        "coef_"
+    ):
 
-        feature_importance_df = pd.DataFrame({
-            "Feature": best_model_object.feature_names_in_,
-            "Importance": abs(best_model_object.coef_)
-        })
+        feature_importance_df = pd.DataFrame(
+            {
+                "Feature":
+                    best_model_object.feature_names_in_,
 
-        feature_importance_df = feature_importance_df.sort_values(
-            by="Importance",
-            ascending=False
+                "Importance":
+                    abs(
+                        best_model_object.coef_
+                    )
+            }
         )
 
-        st.dataframe(feature_importance_df)
+        feature_importance_df = (
+            feature_importance_df.sort_values(
+                by="Importance",
+                ascending=False
+            )
+        )
+
+        st.dataframe(
+            feature_importance_df,
+            use_container_width=True
+        )
 
         st.bar_chart(
-            feature_importance_df.set_index("Feature")
+            feature_importance_df.set_index(
+                "Feature"
+            )
         )
 
     else:
@@ -127,20 +384,32 @@ def show_model_page(models_dict, evaluation_results, y_test):
         )
 
     # ---------------- ACTUAL VS PREDICTED ----------------
+
     if is_regression:
 
-        st.subheader("📉 Actual vs Predicted")
+        st.subheader(
+            "📉 Actual vs Predicted"
+        )
 
-        best_predictions = models_dict[best_model_name]["predictions"]
+        best_predictions = models_dict[
+            best_model_name
+        ]["predictions"]
 
-        plot_df = pd.DataFrame({
-            "Actual": y_test.values,
-            "Predicted": best_predictions
-        })
+        plot_df = pd.DataFrame(
+            {
+                "Actual": y_test.values,
+                "Predicted": best_predictions
+            }
+        )
 
-        st.dataframe(plot_df.head())
+        st.dataframe(
+            plot_df.head(),
+            use_container_width=True
+        )
 
-        fig, ax = plt.subplots(figsize=(7, 5))
+        fig, ax = plt.subplots(
+            figsize=(7, 5)
+        )
 
         ax.scatter(
             plot_df["Actual"],
@@ -163,31 +432,51 @@ def show_model_page(models_dict, evaluation_results, y_test):
             linestyle="--"
         )
 
-        ax.set_xlabel("Actual Values")
-
-        ax.set_ylabel("Predicted Values")
-
-        ax.set_title("Actual vs Predicted")
-
-        st.pyplot(fig)
-
-        # ---------------- RESIDUAL ANALYSIS ----------------
-        st.subheader("📉 Residual Analysis")
-
-        plot_df["Residual"] = (
-            plot_df["Actual"] - plot_df["Predicted"]
+        ax.set_xlabel(
+            "Actual Values"
         )
 
-        st.write("### Residual Preview")
+        ax.set_ylabel(
+            "Predicted Values"
+        )
+
+        ax.set_title(
+            "Actual vs Predicted"
+        )
+
+        st.pyplot(
+            fig
+        )
+
+        # ---------------- RESIDUAL ANALYSIS ----------------
+
+        st.subheader(
+            "📉 Residual Analysis"
+        )
+
+        plot_df["Residual"] = (
+            plot_df["Actual"]
+            - plot_df["Predicted"]
+        )
+
+        st.write(
+            "### Residual Preview"
+        )
 
         st.dataframe(
             plot_df[
-                ["Actual", "Predicted", "Residual"]
-            ].head()
+                [
+                    "Actual",
+                    "Predicted",
+                    "Residual"
+                ]
+            ].head(),
+            use_container_width=True
         )
 
-        # Residual Scatter Plot
-        fig2, ax2 = plt.subplots(figsize=(7, 5))
+        fig2, ax2 = plt.subplots(
+            figsize=(7, 5)
+        )
 
         ax2.scatter(
             plot_df["Predicted"],
@@ -199,34 +488,169 @@ def show_model_page(models_dict, evaluation_results, y_test):
             linestyle="--"
         )
 
-        ax2.set_xlabel("Predicted Values")
+        ax2.set_xlabel(
+            "Predicted Values"
+        )
 
-        ax2.set_ylabel("Residual")
+        ax2.set_ylabel(
+            "Residual"
+        )
 
-        ax2.set_title("Residual Plot")
+        ax2.set_title(
+            "Residual Plot"
+        )
 
-        st.pyplot(fig2)
+        st.pyplot(
+            fig2
+        )
 
-        # Residual Distribution
-        fig3, ax3 = plt.subplots(figsize=(7, 5))
+        fig3, ax3 = plt.subplots(
+            figsize=(7, 5)
+        )
 
         ax3.hist(
             plot_df["Residual"],
             bins=20
         )
 
-        ax3.set_xlabel("Residual")
+        ax3.set_xlabel(
+            "Residual"
+        )
 
-        ax3.set_ylabel("Frequency")
+        ax3.set_ylabel(
+            "Frequency"
+        )
 
-        ax3.set_title("Residual Distribution")
+        ax3.set_title(
+            "Residual Distribution"
+        )
 
-        st.pyplot(fig3)
+        st.pyplot(
+            fig3
+        )
 
     else:
 
-        st.subheader("📉 Confusion Matrix")
+        st.subheader(
+            "📉 Confusion Matrix"
+        )
 
         st.info(
             "Confusion Matrix visualization will be added for classification models."
+        )
+
+    # ---------------- EXPERIMENT HISTORY ----------------
+
+    st.subheader(
+        "🧪 Experiment History"
+    )
+
+    history_df = get_history()
+
+    if history_df.empty:
+
+        st.info(
+            "No experiments have been recorded yet."
+        )
+
+    else:
+
+        st.dataframe(
+            history_df,
+            use_container_width=True
+        )
+
+        # ---------------- DOWNLOAD HISTORY ----------------
+
+        csv = history_df.to_csv(
+            index=False
+        ).encode("utf-8")
+
+        st.download_button(
+            label="📥 Download History (CSV)",
+            data=csv,
+            file_name="experiment_history.csv",
+            mime="text/csv"
+        )
+
+        excel_buffer = BytesIO()
+
+        with pd.ExcelWriter(
+            excel_buffer,
+            engine="openpyxl"
+        ) as writer:
+
+            history_df.to_excel(
+                writer,
+                index=False,
+                sheet_name="History"
+            )
+
+        st.download_button(
+            label="📥 Download History (Excel)",
+            data=excel_buffer.getvalue(),
+            file_name="experiment_history.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.metric(
+                "Total Experiments",
+                len(history_df)
+            )
+
+        with col2:
+
+            st.metric(
+                "Latest Best Model",
+                history_df.iloc[-1]["Best Model"]
+            )
+
+        with col3:
+
+            average_score = round(
+                history_df["Score"].mean(),
+                4
+            )
+
+            st.metric(
+                "Average Score",
+                average_score
+            )
+
+        if st.button(
+            "🗑 Clear Experiment History"
+        ):
+
+            clear_history()
+
+            st.success(
+                "Experiment history cleared successfully."
+            )
+
+            st.rerun()
+        # ---------------- LEADERBOARD ----------------
+
+        st.subheader(
+            "🏆 Experiment Leaderboard"
+        )
+
+        leaderboard_df = history_df.sort_values(
+            by="Score",
+            ascending=False,
+            ignore_index=True
+        )
+
+        leaderboard_df.index += 1
+
+        st.dataframe(
+            leaderboard_df,
+            use_container_width=True
+        )
+
+        st.caption(
+            "Experiments are ranked according to their evaluation score."
         )

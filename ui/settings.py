@@ -73,6 +73,13 @@ def show_settings_panel():
         value=True
     )
 
+    # -------- NEW --------
+    hyperparameter_tuning = st.sidebar.checkbox(
+        "Enable Hyperparameter Tuning",
+        value=False,
+        help="Automatically search for the best model parameters using GridSearchCV."
+    )
+
     # ---------------- Summary ----------------
     st.sidebar.markdown("---")
 
@@ -81,6 +88,9 @@ def show_settings_panel():
     st.sidebar.write(f"**Test Size:** {int(test_size * 100)}%")
     st.sidebar.write(f"**Random State:** {random_state}")
     st.sidebar.write(f"**Problem Type:** {problem_type}")
+    st.sidebar.write(
+        f"**Hyperparameter Tuning:** {'Enabled' if hyperparameter_tuning else 'Disabled'}"
+    )
 
     settings = {
         "test_size": test_size,
@@ -88,7 +98,8 @@ def show_settings_panel():
         "problem_type": problem_type,
         "scaling": scaling,
         "encoding": encoding,
-        "save_model": save_model
+        "save_model": save_model,
+        "hyperparameter_tuning": hyperparameter_tuning
     }
 
     return settings
