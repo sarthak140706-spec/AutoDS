@@ -1,6 +1,8 @@
 import streamlit as st
 
 from ui.upload import show_upload_page
+from ui.settings import show_settings_panel
+from ui.about import show_about_page
 
 st.set_page_config(
     page_title="AutoDS",
@@ -9,11 +11,40 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🤖 AutoDS – AI Data Science Copilot")
+# ---------------- SIDEBAR ----------------
 
-st.markdown("---")
+st.sidebar.title("🤖 AutoDS")
+
+page = st.sidebar.radio(
+    "Navigation",
+    [
+        "🏠 AutoDS",
+        "⚙️ Settings",
+        "ℹ️ About"
+    ]
+)
+
+st.sidebar.markdown("---")
 
 st.sidebar.title("Progress")
-st.sidebar.success("🚀 Sprint 9 - Experiment Tracking, Analytics & Leaderboard")
+st.sidebar.success(
+    "🚀 Sprint 10 - Final Release"
+)
 
-df=show_upload_page()
+# ---------------- PAGES ----------------
+
+if page == "🏠 AutoDS":
+
+    st.title("🤖 AutoDS – AI Data Science Copilot")
+
+    st.markdown("---")
+
+    show_upload_page()
+
+elif page == "⚙️ Settings":
+
+    show_settings_panel()
+
+elif page == "ℹ️ About":
+
+    show_about_page()

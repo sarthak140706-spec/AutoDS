@@ -227,6 +227,8 @@ def show_upload_page():
         show_model_page(
             models_dict,
             evaluation_results,
+            X_train,
+            X_test,
             y_test
         )
 

@@ -1,3 +1,9 @@
+
+# NOTE:
+# This version has been cleaned for Step 10.9 preparation.
+# - Removed duplicate model_monitor import.
+# - Interactive dashboard helper imports retained.
+# - Ready for replacing Streamlit charts with Plotly helper functions.
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,11 +13,39 @@ from utils.history import (
     get_history,
     clear_history
 )
-
+from utils.shap_explainer import (
+    generate_shap_explanation,
+    show_shap_summary,
+    show_shap_bar,
+    get_top_shap_features
+)
+from utils.permutation_importance import (
+    calculate_permutation_importance,
+    plot_permutation_importance
+)
+from utils.explainability_report import (
+    generate_explainability_report
+)
+from utils.fairness import (
+    generate_fairness_report
+)
+from utils.model_monitor import (
+    generate_model_monitoring_report
+)
+from utils.interactive_dashboard import (
+    create_model_comparison_chart,
+    create_cv_chart,
+    create_feature_importance_chart,
+    create_residual_chart
+)
+import shap
+from sklearn.inspection import PartialDependenceDisplay
 
 def show_model_page(
     models_dict,
     evaluation_results,
+    X_train,
+    X_test,
     y_test
 ):
 
@@ -383,6 +417,276 @@ def show_model_page(
             "Feature importance is not available for this model."
         )
 
+
+    # ---------------- SHAP EXPLAINABILITY ----------------
+
+    st.subheader(
+        "🧠 SHAP Explainability"
+    )
+
+    shap_results = generate_shap_explanation(
+        best_model_object,
+        X_train,
+        X_test
+    )
+
+    if shap_results is None:
+
+        st.info(
+            "SHAP Explainability is not supported for this model."
+        )
+
+    else:
+
+        st.write(
+            "### SHAP Summary Plot"
+        )
+
+        summary_fig = show_shap_summary(
+            shap_results["shap_values"],
+            X_test
+        )
+
+        st.pyplot(
+            summary_fig
+        )
+
+        st.write(
+            "### SHAP Feature Importance"
+        )
+
+        bar_fig = show_shap_bar(
+            shap_results["shap_values"],
+            X_test
+        )
+
+        st.pyplot(
+            bar_fig
+        )
+
+        st.write(
+            "### Top SHAP Features"
+        )
+
+        top_features = get_top_shap_features(
+            shap_results["shap_values"],
+            X_test
+        )
+
+        st.dataframe(
+            top_features,
+            use_container_width=True
+        )
+
+        # ---------------- SINGLE PREDICTION EXPLANATION ----------------
+
+        st.subheader(
+            "🔍 Explain Individual Prediction"
+        )
+
+        sample_index = st.selectbox(
+            "Select Test Sample",
+            options=range(len(X_test)),
+            format_func=lambda x: f"Sample {x}"
+        )
+
+        selected_sample = X_test.iloc[[sample_index]]
+
+        st.write(
+            "### Selected Sample"
+        )
+
+        st.dataframe(
+            selected_sample,
+            use_container_width=True
+        )
+
+        try:
+
+            st.write(
+                "### SHAP Waterfall Plot"
+            )
+
+            fig = plt.figure(
+                figsize=(10, 6)
+            )
+
+            shap.plots.waterfall(
+                shap_results["shap_values"][sample_index],
+                show=False
+            )
+
+            st.pyplot(fig)
+
+        except Exception:
+
+            st.info(
+                "Waterfall plot is not supported for this model."
+            )
+    # ---------------- PERMUTATION FEATURE IMPORTANCE ----------------
+
+    st.subheader(
+        "🔄 Permutation Feature Importance"
+    )
+
+    if is_regression:
+
+        scoring = "r2"
+
+    else:
+
+        scoring = "accuracy"
+
+    permutation_df = calculate_permutation_importance(
+
+        best_model_object,
+
+        X_test,
+
+        y_test,
+
+        scoring=scoring
+
+    )
+
+    if permutation_df is None:
+
+        st.info(
+            "Permutation Feature Importance is not available for this model."
+        )
+
+    else:
+
+        st.dataframe(
+
+            permutation_df,
+
+            use_container_width=True
+
+        )
+
+        permutation_fig = plot_permutation_importance(
+
+            permutation_df
+
+        )
+
+        st.pyplot(
+            permutation_fig
+        )
+
+    # ---------------- EXPLAINABILITY REPORT ----------------
+
+    st.subheader(
+        "📝 Explainability Report"
+    )
+
+    try:
+
+        report = generate_explainability_report(
+            top_features,
+            permutation_df,
+            best_model_name
+        )
+
+        st.text_area(
+            "Generated Report",
+            report,
+            height=250
+        )
+
+        st.download_button(
+            label="📄 Download Explainability Report",
+            data=report,
+            file_name="explainability_report.txt",
+            mime="text/plain"
+        )
+
+    except Exception:
+
+        st.info(
+            "Explainability report could not be generated."
+        )
+
+    # ---------------- FAIRNESS REPORT ----------------
+
+    st.subheader(
+        "⚖️ Fairness Analysis"
+    )
+
+    try:
+
+        fairness_report = generate_fairness_report(
+            X_test,
+            models_dict[best_model_name]["predictions"]
+        )
+
+        st.text_area(
+            "Fairness Report",
+            fairness_report,
+            height=250
+        )
+
+        st.download_button(
+            label="📄 Download Fairness Report",
+            data=fairness_report,
+            file_name="fairness_report.txt",
+            mime="text/plain"
+        )
+
+    except Exception:
+
+        st.info(
+            "Fairness analysis could not be generated."
+        )
+
+    # ---------------- PARTIAL DEPENDENCE PLOTS ----------------
+
+    st.subheader(
+        "📊 Partial Dependence Plots"
+    )
+
+    try:
+
+        if hasattr(best_model_object, "predict"):
+
+            feature_names = list(
+                X_test.columns
+            )
+
+            top_features = feature_names[:2]
+
+            fig, ax = plt.subplots(
+                figsize=(10, 5)
+            )
+
+            PartialDependenceDisplay.from_estimator(
+
+                estimator=best_model_object,
+
+                X=X_test,
+
+                features=top_features,
+
+                feature_names=feature_names,
+
+                ax=ax
+
+            )
+
+            st.pyplot(fig)
+
+        else:
+
+            st.info(
+                "Partial Dependence Plot is not available for this model."
+            )
+
+    except Exception:
+
+        st.info(
+            "Partial Dependence Plot is not supported for this model."
+        )
     # ---------------- ACTUAL VS PREDICTED ----------------
 
     if is_regression:
@@ -560,6 +864,37 @@ def show_model_page(
             use_container_width=True
         )
 
+        # ---------------- MODEL MONITORING REPORT ----------------
+
+        st.subheader(
+            "📡 Model Monitoring Dashboard"
+        )
+
+        try:
+
+            monitoring_report = generate_model_monitoring_report(
+                history_df
+            )
+
+            st.text_area(
+                "Monitoring Report",
+                monitoring_report,
+                height=250
+            )
+
+            st.download_button(
+                label="📄 Download Monitoring Report",
+                data=monitoring_report,
+                file_name="model_monitoring_report.txt",
+                mime="text/plain"
+            )
+
+        except Exception:
+
+            st.info(
+                "Monitoring report could not be generated."
+            )
+
         # ---------------- DOWNLOAD HISTORY ----------------
 
         csv = history_df.to_csv(
@@ -632,6 +967,7 @@ def show_model_page(
             )
 
             st.rerun()
+
         # ---------------- LEADERBOARD ----------------
 
         st.subheader(
